@@ -2,13 +2,15 @@ const { prisma } = require("../prisma/prisma-client");
 const bcrypt = require("bcrypt");
 const Jdenticon = require("jdenticon");
 const path = require("path");
+const fs = require("fs");
+const jwt = require("jsonwebtoken");
+
+require("dotenv").config();
 
 const UserController = {
   register: async (req, res) => {
     try {
       const { email, password, name } = req.body;
-
-      console.log(email, password, name);
 
       if (!email || !password || !name)
         return res.status(400).json({ message: "Все поля обязательные!" });
@@ -27,7 +29,18 @@ const UserController = {
       const avatartName = `${name}_${Date.now()}.png`;
       const avatarPath = path.join(__dirname, "../uploads", avatartName);
 
-      return res.status(200).json({ message: "Success" });
+      fs.writeFileSync(avatarPath, png);
+
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashPassword,
+          name,
+          avatarUrl: `/uploads/${avatarPath}`,
+        },
+      });
+
+      return res.status(200).json(user);
     } catch (err) {
       console.error(err);
 
@@ -36,7 +49,30 @@ const UserController = {
   },
 
   login: async (req, res) => {
-    await res.send("login");
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password)
+        return res.status(400).json({ message: "Все поля обязательные!" });
+
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      if (!user)
+        return res.status(400).json({ message: "Пользователь не найден!" });
+
+      const isValidPass = await bcrypt.compare(password, user.password);
+
+      if (!isValidPass)
+        return res.status(400).json({ message: "Неверный пароль!" });
+
+      const token = jwt.sign(user.id, process.env.SECRETKEY);
+
+      return res.status(200).json(token);
+    } catch (err) {
+      console.error(err);
+
+      return res.status(500).json({ message: "Ошибка сервера!" });
+    }
   },
 
   getUserById: async (req, res) => {
