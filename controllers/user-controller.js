@@ -36,7 +36,7 @@ const UserController = {
           email,
           password: hashPassword,
           name,
-          avatarUrl: `/uploads/${avatarPath}`,
+          avatarUrl: `/uploads/${avatartName}`,
         },
       });
 
@@ -65,7 +65,7 @@ const UserController = {
       if (!isValidPass)
         return res.status(400).json({ message: "Неверный пароль!" });
 
-      const token = jwt.sign(user.id, process.env.SECRETKEY);
+      const token = jwt.sign({ userId: user.id }, process.env.SECRETKEY);
 
       return res.status(200).json(token);
     } catch (err) {
@@ -76,15 +76,113 @@ const UserController = {
   },
 
   getUserById: async (req, res) => {
-    await res.send("getUserById");
+    try {
+      const { id } = req.params;
+      const userId = req.user;
+
+      const user = await prisma.user.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          followers: true,
+          following: true,
+        },
+      });
+
+      if (!user)
+        return res.status(404).json({ message: "Пользователь не найден!" });
+
+      const isFollowing = await prisma.follows.findFirst({
+        where: {
+          AND: [{ followerId: userId }, { followingId: id }],
+        },
+      });
+
+      return res
+        .status(200)
+        .json({ ...user, isFollowing: Boolean(isFollowing) });
+    } catch (err) {
+      console.error(err);
+
+      return res.status(500).json({ message: "Ошибка сервера!" });
+    }
   },
 
   updateUser: async (req, res) => {
-    await res.send("updateUser");
+    try {
+      const { id } = req.params;
+      const { email, name, dateOfBirth, bio, location } = req.body;
+
+      let filePath;
+
+      if (req.file && req.file.path) {
+        filePath = req.file.path;
+      }
+
+      if (id !== req.user)
+        return res.status(403).json({ message: "Ошибка авторизации!" });
+
+      const existingUser = await prisma.user.findFirst({ where: { email } });
+
+      if (existingUser && existingUser.id !== id)
+        return res.status(400).json({ message: "Почта уже используется!" });
+
+      // Если undefined не перезапишет, а оставит всё как есть
+      const user = await prisma.user.update({
+        where: { id },
+        data: {
+          email: email || undefined,
+          name: name || undefined,
+          avatarUrl: filePath ? `/${filePath}` : undefined,
+          dateOfBirth: dateOfBirth || undefined,
+          bio: bio || undefined,
+          location: location || undefined,
+        },
+      });
+
+      return res.status(200).json(user);
+    } catch (err) {
+      console.error(err);
+
+      return res.status(500).json({ message: "Ошибка сервера!" });
+    }
   },
 
   currentUser: async (req, res) => {
-    await res.send("currentUser");
+    try {
+      const user = await prisma.user.findUnique({
+        where: {
+          id: req.user,
+        },
+
+        include: {
+          followers: {
+            include: {
+              follower: true,
+            },
+          },
+
+          following: {
+            include: {
+              following: true,
+            },
+          },
+        },
+      });
+
+      if (!user)
+        return res
+          .status(400)
+          .json({ message: "Не удалось найти пользователя!" });
+
+      return res.status(200).json(user);
+    } catch (err) {
+      console.error(err);
+
+      return res.status(500).json({ message: "Ошибка сервера!" });
+    }
   },
 };
 
