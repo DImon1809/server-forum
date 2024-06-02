@@ -45,17 +45,15 @@ const LikeController = {
       const existingLike = await prisma.like.findFirst({
         where: {
           id,
-          userId,
         },
       });
 
-      if (!existingLike)
+      if (!existingLike || existingLike.userId !== userId)
         return res.status(400).json({ message: "Лайка не существует!" });
 
       const like = await prisma.like.deleteMany({
         where: {
           id,
-          userId,
         },
       });
 

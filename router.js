@@ -26,7 +26,12 @@ router.post("/register", UserController.register);
 router.post("/login", UserController.login);
 router.get("/current", checkAuth, UserController.currentUser);
 router.get("/users/:id", checkAuth, UserController.getUserById);
-router.put("/users/:id", checkAuth, UserController.updateUser);
+router.put(
+  "/users/:id",
+  checkAuth,
+  uploads.single("avatar"),
+  UserController.updateUser
+);
 
 // Router постов
 router.post("/posts", checkAuth, PostController.createPost);

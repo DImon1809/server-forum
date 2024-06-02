@@ -1,6 +1,7 @@
 const express = require("express");
 const router = require("./router");
 const cors = require("cors");
+const path = require("path");
 
 require("dotenv").config();
 
@@ -20,4 +21,12 @@ app.use("/api", router);
 
 app.get("/", (req, res) => {
   res.send("<h1>Hello world</h1>");
+});
+
+app.get("/uploads/:id", (req, res) => {
+  const imageId = req.params.id;
+
+  const imagePath = path.join(__dirname, "uploads", imageId);
+
+  return res.sendFile(imagePath);
 });
